@@ -1,4 +1,4 @@
-site_name: python_pkg_template
+site_name: point_cloud_nets
 theme:
   name: material
 plugins:
