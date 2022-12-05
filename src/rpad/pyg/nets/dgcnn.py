@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch_geometric.nn as tgnn
 from torch_geometric.data import Batch, Data
 
-from point_cloud_nets.pyg.mlp import MLP, MLPParams
+from rpad.pyg.nets.mlp import MLP, MLPParams
 
 
 @dataclass

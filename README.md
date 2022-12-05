@@ -1,6 +1,6 @@
-# point_cloud_nets
+# pyg_libs
 
-Point Cloud Networks for r-pad.
+Various pytorch-geometric libraries, networks, etc.
 
 Currently have (implemented in pytorch-geometric):
 

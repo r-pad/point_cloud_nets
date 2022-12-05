@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from torch_geometric.data import Data
 from torch_geometric.nn import PointConv, fps, global_max_pool, knn_interpolate, radius
 
-from point_cloud_nets.pyg.mlp import MLP, MLPParams
+from rpad.pyg.nets.mlp import MLP, MLPParams
 
 
 @dataclass
