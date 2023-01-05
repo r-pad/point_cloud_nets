@@ -45,6 +45,9 @@ build_docs = [
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+rpad = ["py.typed"]
+
 [tool.isort]
 profile = "black"
 
