@@ -15,6 +15,7 @@ dependencies = [
   "torch-cluster >= 1.6.0",
   "torch-spline-conv >= 1.2.1",
   "torch-geometric >= 2.0",
+  "tqdm",
 ]
 
 [build-system]
@@ -59,8 +60,10 @@ mypy_path = "src"
 namespace_packages = true
 explicit_package_bases = true
 
-# # Uncomment this when you have imports for mypy to ignore.
-# [[tool.mypy.overrides]]
-# module = [
-# ]
-# ignore_missing_imports = true
+# Uncomment this when you have imports for mypy to ignore.
+[[tool.mypy.overrides]]
+module = [
+  "torch_geometric.*",
+  "tqdm.*",
+]
+ignore_missing_imports = true

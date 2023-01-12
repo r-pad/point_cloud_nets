@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Sequence
+from typing import List, Sequence
 
 from torch import nn as nn
 
@@ -38,7 +38,7 @@ def MLP(in_dim: int, out_dim: int, p: MLPParams):
             layer_nodes.append(nn.BatchNorm1d(channels[i]))
         layers.append(nn.Sequential(*layer_nodes))
 
-    final_layer = [nn.Linear(channels[-2], channels[-1])]
+    final_layer: List[nn.Module] = [nn.Linear(channels[-2], channels[-1])]
 
     if p.out_act == "relu":
         final_layer.append(nn.ReLU())
