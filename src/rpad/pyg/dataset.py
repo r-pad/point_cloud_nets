@@ -181,7 +181,7 @@ def parallel_sample(
         raise ValueError("Sampling failed, please debug.")
 
 
-class MultiKeyDataset(tgd.Dataset):
+class CachedByKeyDataset(tgd.Dataset):
     """A hierarchical dataset, where each key has multiple data samples associated with it.
 
     Consider each key as a unique entity; for instance, the entity might be:
@@ -202,32 +202,30 @@ class MultiKeyDataset(tgd.Dataset):
         self,
         dset_cls: Type[CanSample],
         dset_kwargs: Dict[str, Any],
-        sample_keys: Sequence[Tuple[str]],
+        data_keys: Sequence[Tuple[str]],
         root: str,
         processed_dirname: str,
         n_repeat: int,
         n_proc: int = -1,
-        use_processed: bool = True,
         seed=None,
         transform: Optional[Callable] = None,
         pre_transform: Optional[Callable] = None,
         pre_filter: Optional[Callable] = None,
         log: bool = True,
     ):
-        for key in sample_keys:
+        for key in data_keys:
             for arg in key:
                 if not isinstance(arg, str):
                     raise ValueError("sample keys have to be strings, for now...")
         # Dataset.
         self._dset_cls = dset_cls
         self._dset_kwargs = dset_kwargs
-        self._sample_keys = sample_keys
+        self._data_keys = data_keys
 
         # Sampling parameters.
         self._processed_dirname = processed_dirname
         self._n_repeat = n_repeat
         self._n_proc = n_proc
-        self._use_processed = use_processed
 
         # Random seed. Important for reproducibility!
         self._seed = seed
@@ -235,43 +233,31 @@ class MultiKeyDataset(tgd.Dataset):
         # This has to come before inmem_dset is created.
         super().__init__(root, transform, pre_transform, pre_filter, log)
 
-        if not self._use_processed:
-            # If we don't want to use the processed version (i.e. for on-the-fly loading),
-            # we just instantiate.
-            self.dataset = dset_cls(**dset_kwargs)
-        else:
-            self.inmem_dset: td.ConcatDataset = td.ConcatDataset(
-                [SinglePathDataset(data_path) for data_path in self.processed_paths]
-            )
+        self.inmem_dset: td.ConcatDataset = td.ConcatDataset(
+            [SinglePathDataset(data_path) for data_path in self.processed_paths]
+        )
 
     @property
     def processed_file_names(self) -> List[str]:
-        return [f"{'_'.join(key)}_{self._n_repeat}.pt" for key in self._sample_keys]
+        return [f"{'_'.join(key)}_{self._n_repeat}.pt" for key in self._data_keys]
 
     @property
     def processed_dir(self) -> str:
         return os.path.join(self.root, self._processed_dirname)
 
     def len(self) -> int:
-        return len(self._sample_keys) * self._n_repeat
+        return len(self._data_keys) * self._n_repeat
 
     def get(self, idx: int, seed=None):
-        if self._use_processed:
-            return self.inmem_dset[idx]
-        else:
-            sample_key = self._sample_keys[idx // self._n_repeat]
-            return self.dataset.get_data(*sample_key, seed=seed)
+        return self.inmem_dset[idx]
 
     def process(self):
-        if not self._use_processed:
-            return
-        else:
-            parallel_sample(
-                self._dset_cls,
-                self._dset_kwargs,
-                self._sample_keys,
-                self.processed_dir,
-                self._n_repeat,
-                self._n_proc,
-                self._seed,
-            )
+        parallel_sample(
+            self._dset_cls,
+            self._dset_kwargs,
+            self._data_keys,
+            self.processed_dir,
+            self._n_repeat,
+            self._n_proc,
+            self._seed,
+        )

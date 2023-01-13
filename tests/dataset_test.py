@@ -4,7 +4,7 @@ import tempfile
 import numpy as np
 import torch_geometric.data as tgd
 
-from rpad.pyg.dataset import MultiKeyDataset
+from rpad.pyg.dataset import CachedByKeyDataset
 
 
 class SimpleDataset:
@@ -18,15 +18,14 @@ class SimpleDataset:
 
 def test_parallel_sample():
     with tempfile.TemporaryDirectory() as tmpdir:
-        dset = MultiKeyDataset(
+        dset = CachedByKeyDataset(
             dset_cls=SimpleDataset,
             dset_kwargs=dict(),
-            sample_keys=[(str(i),) for i in range(100)],
+            data_keys=[(str(i),) for i in range(100)],
             root=tmpdir,
             processed_dirname="processed_test",
             n_repeat=10,
             n_proc=10,
-            use_processed=True,
             seed=12345,
         )
 
@@ -48,15 +47,14 @@ def test_parallel_sample():
 
 def test_parallel_reproducible():
     with tempfile.TemporaryDirectory() as tmpdir:
-        dset = MultiKeyDataset(
+        dset = CachedByKeyDataset(
             dset_cls=SimpleDataset,
             dset_kwargs=dict(),
-            sample_keys=[(str(i),) for i in range(100)],
+            data_keys=[(str(i),) for i in range(100)],
             root=tmpdir,
             processed_dirname="processed_test",
             n_repeat=10,
             n_proc=10,
-            use_processed=True,
             seed=12345,
         )
 
@@ -64,15 +62,14 @@ def test_parallel_reproducible():
         data1 = dset[0]
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        dset = MultiKeyDataset(
+        dset = CachedByKeyDataset(
             dset_cls=SimpleDataset,
             dset_kwargs=dict(),
-            sample_keys=[(str(i),) for i in range(100)],
+            data_keys=[(str(i),) for i in range(100)],
             root=tmpdir,
             processed_dirname="processed_test",
             n_repeat=10,
             n_proc=10,
-            use_processed=True,
             seed=12345,
         )
 
@@ -82,15 +79,14 @@ def test_parallel_reproducible():
     assert np.array_equal(data1.pos, data2.pos)
 
     with tempfile.TemporaryDirectory() as tmpdir:
-        dset = MultiKeyDataset(
+        dset = CachedByKeyDataset(
             dset_cls=SimpleDataset,
             dset_kwargs=dict(),
-            sample_keys=[(str(i),) for i in range(100)],
+            data_keys=[(str(i),) for i in range(100)],
             root=tmpdir,
             processed_dirname="processed_test",
             n_repeat=10,
             n_proc=10,
-            use_processed=True,
             seed=54321,
         )
 
