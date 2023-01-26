@@ -13,6 +13,7 @@ from typing import (
     Sequence,
     Tuple,
     Type,
+    Union,
     runtime_checkable,
 )
 
@@ -202,8 +203,8 @@ class CachedByKeyDataset(tgd.Dataset):
         self,
         dset_cls: Type[CanSample],
         dset_kwargs: Dict[str, Any],
-        data_keys: Sequence[Tuple[str]],
-        root: str,
+        data_keys: Union[Sequence[Tuple[str]], Sequence[str]],
+        root: Union[str, Path],
         processed_dirname: str,
         n_repeat: int,
         n_proc: int = -1,
@@ -213,6 +214,7 @@ class CachedByKeyDataset(tgd.Dataset):
         pre_filter: Optional[Callable] = None,
         log: bool = True,
     ):
+        data_keys = [(key,) if isinstance(key, str) else key for key in data_keys]
         for key in data_keys:
             for arg in key:
                 if not isinstance(arg, str):
