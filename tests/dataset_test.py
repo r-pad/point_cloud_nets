@@ -25,7 +25,7 @@ def test_parallel_sample():
             root=tmpdir,
             processed_dirname="processed_test",
             n_repeat=10,
-            n_proc=10,
+            n_workers=5,
             seed=12345,
         )
 
@@ -54,7 +54,7 @@ def test_parallel_reproducible():
             root=tmpdir,
             processed_dirname="processed_test",
             n_repeat=10,
-            n_proc=10,
+            n_workers=5,
             seed=12345,
         )
 
@@ -69,7 +69,7 @@ def test_parallel_reproducible():
             root=tmpdir,
             processed_dirname="processed_test",
             n_repeat=10,
-            n_proc=10,
+            n_workers=5,
             seed=12345,
         )
 
@@ -86,7 +86,7 @@ def test_parallel_reproducible():
             root=tmpdir,
             processed_dirname="processed_test",
             n_repeat=10,
-            n_proc=10,
+            n_workers=5,
             seed=54321,
         )
 

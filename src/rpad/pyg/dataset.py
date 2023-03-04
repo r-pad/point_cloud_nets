@@ -1,7 +1,5 @@
 import logging
-import multiprocessing
 import os
-import sys
 from pathlib import Path
 from typing import (
     Any,
@@ -17,11 +15,10 @@ from typing import (
     runtime_checkable,
 )
 
-import numpy as np
 import torch
 import torch.utils.data as td
 import torch_geometric.data as tgd
-import tqdm
+from rpad.core.distributed import NPSeed, distributed_eval
 
 
 @runtime_checkable
@@ -29,7 +26,7 @@ class CanSample(Protocol):
     """This is just a dataset which has the 'get_data' function. This function doesn't
     need to be deterministic, for instance if we want to randomly sample viewpoints."""
 
-    def get_data(self, *args, seed=None) -> tgd.Data:
+    def get_data(self, *args, seed: NPSeed = None) -> tgd.Data:
         """The"""
 
 
@@ -58,17 +55,18 @@ class SinglePathDataset(tgd.InMemoryDataset):
 __dataset: Optional[CanSample] = None
 
 
-def __can_sample_init(dset_cls, dset_kwargs):
+def _init_dataset(dset_cls, dset_kwargs):
     global __dataset
     __dataset = dset_cls(**dset_kwargs)
     assert isinstance(dset_cls, CanSample)
 
 
-def __paralel_sample(args: Tuple[int, Tuple, int, str, Any]):
-    task_id, get_data_args, n_repeat, processed_dir, seed = args
-
-    if sys.platform == "linux":
-        os.sched_setaffinity(os.getpid(), [task_id % os.cpu_count()])  # type: ignore
+def _parallel_sample(
+    get_data_args: Tuple,
+    n_repeat: int,
+    processed_path: str,
+    seed: NPSeed,
+):
 
     assert len(get_data_args) >= 1
 
@@ -79,11 +77,11 @@ def __paralel_sample(args: Tuple[int, Tuple, int, str, Any]):
     # were used to generate it.
     prefix = "_".join(get_data_args)
     data_file = f"{prefix}_{n_repeat}.pt"
-    data_path = os.path.join(processed_dir, data_file)
+    data_path = os.path.join(processed_path, data_file)
 
     if os.path.exists(data_path):
         logging.info(f"{data_path} already exists, skipping...")
-        return True
+        return
 
     try:
         # Sample the data.
@@ -94,10 +92,8 @@ def __paralel_sample(args: Tuple[int, Tuple, int, str, Any]):
         # Save it in an in-memory dataset.
         SinglePathDataset.write(data_list, data_path)
 
-        return True
-    except Exception as e:
-        logging.error(f"unable to sample get_data({get_data_args}): {e}")
-        return False
+    except Exception as err:
+        logging.error(f"unable to sample get_data({get_data_args}): {err}")
 
 
 def parallel_sample(
@@ -107,7 +103,9 @@ def parallel_sample(
     processed_path: str,
     n_repeat: int,
     n_proc: int = -1,
-    seed=None,
+    n_workers: int = -1,
+    n_proc_per_worker: int = 2,
+    seed: Optional[int] = None,
 ):
     """Run parallel sampling in a dataset. Assumes that we're operating on a
     partnet-style dataset, where we have a unique object which may be sampled
@@ -143,42 +141,29 @@ def parallel_sample(
     Raises:
         ValueError: If any sampling fails, this method will raise an exception.
     """
-    if n_proc == -1:
-        n_proc = os.cpu_count()  # type: ignore
-
-    n_keys = len(get_data_args)
-
     # task_number, args, n_repeat, processed_dir, seed
-    ps_args = list(
-        zip(
-            range(n_keys),
-            get_data_args,
-            [n_repeat] * n_keys,
-            [processed_path] * n_keys,
-            np.random.SeedSequence(seed).spawn(n_keys),
-        )
+    ps_args = [
+        {
+            "get_data_args": args,
+            "n_repeat": n_repeat,
+            "processed_path": processed_path,
+        }
+        for args in get_data_args
+    ]
+
+    results, completeds = distributed_eval(
+        _parallel_sample,  # type: ignore
+        kwargs_list=ps_args,
+        init_fn=_init_dataset,
+        init_args=(dset_cls, dset_kwargs),
+        pre_fn=None,
+        post_fn=None,
+        n_workers=n_workers,
+        n_proc_per_worker=n_proc_per_worker,
+        seed=seed,
     )
 
-    # Debugging, means in-memory.
-    if n_proc == 0:
-        print("sampling with no workers, debug")
-        # Initialize the dataset.
-        __can_sample_init(dset_cls, dset_kwargs)
-
-        res = [__paralel_sample(args) for args in tqdm.tqdm(ps_args)]
-
-    else:
-        multiprocessing.set_start_method("spawn", force=True)
-        # Create a multiprocessing pool, and initialize it with a global dataset object
-        # that can be used to sample things.
-        pool = multiprocessing.Pool(n_proc, __can_sample_init, (dset_cls, dset_kwargs))
-
-        # Perform the parallel mapping.
-        res = list(
-            tqdm.tqdm(pool.imap(__paralel_sample, ps_args), total=len(get_data_args))
-        )
-
-    if not all(res):
+    if not all(completeds):
         raise ValueError("Sampling failed, please debug.")
 
 
@@ -207,7 +192,8 @@ class CachedByKeyDataset(tgd.Dataset):
         root: Union[str, Path],
         processed_dirname: str,
         n_repeat: int,
-        n_proc: int = -1,
+        n_workers: int = -1,
+        n_proc_per_worker: int = 2,
         seed=None,
         transform: Optional[Callable] = None,
         pre_transform: Optional[Callable] = None,
@@ -227,7 +213,8 @@ class CachedByKeyDataset(tgd.Dataset):
         # Sampling parameters.
         self._processed_dirname = processed_dirname
         self._n_repeat = n_repeat
-        self._n_proc = n_proc
+        self._n_workers = n_workers
+        self._n_proc_per_worker = n_proc_per_worker
 
         # Random seed. Important for reproducibility!
         self._seed = seed
@@ -250,7 +237,7 @@ class CachedByKeyDataset(tgd.Dataset):
     def len(self) -> int:
         return len(self._data_keys) * self._n_repeat
 
-    def get(self, idx: int, seed=None):
+    def get(self, idx: int):
         return self.inmem_dset[idx]
 
     def process(self):
@@ -260,6 +247,7 @@ class CachedByKeyDataset(tgd.Dataset):
             self._data_keys,
             self.processed_dir,
             self._n_repeat,
-            self._n_proc,
-            self._seed,
+            n_workers=self._n_workers,
+            n_proc_per_worker=self._n_proc_per_worker,
+            seed=self._seed,
         )
