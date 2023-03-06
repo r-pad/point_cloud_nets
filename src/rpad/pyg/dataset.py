@@ -67,7 +67,6 @@ def _parallel_sample(
     processed_path: str,
     seed: NPSeed,
 ):
-
     assert len(get_data_args) >= 1
 
     global __dataset
