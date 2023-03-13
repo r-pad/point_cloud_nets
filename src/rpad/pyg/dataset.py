@@ -5,12 +5,14 @@ from typing import (
     Any,
     Callable,
     Dict,
+    Generic,
     List,
     Optional,
     Protocol,
     Sequence,
     Tuple,
     Type,
+    TypeVar,
     Union,
     runtime_checkable,
 )
@@ -166,7 +168,10 @@ def parallel_sample(
         raise ValueError("Sampling failed, please debug.")
 
 
-class CachedByKeyDataset(tgd.Dataset):
+T = TypeVar("T", bound=CanSample)
+
+
+class CachedByKeyDataset(tgd.Dataset, Generic[T]):
     """A hierarchical dataset, where each key has multiple data samples associated with it.
 
     Consider each key as a unique entity; for instance, the entity might be:
@@ -185,7 +190,7 @@ class CachedByKeyDataset(tgd.Dataset):
 
     def __init__(
         self,
-        dset_cls: Type[CanSample],
+        dset_cls: Type[T],
         dset_kwargs: Dict[str, Any],
         data_keys: Union[Sequence[Tuple[str]], Sequence[str]],
         root: Union[str, Path],
@@ -217,6 +222,8 @@ class CachedByKeyDataset(tgd.Dataset):
 
         # Random seed. Important for reproducibility!
         self._seed = seed
+
+        self.dataset = self._dset_cls(**dset_kwargs)
 
         # This has to come before inmem_dset is created.
         super().__init__(root, transform, pre_transform, pre_filter, log)
