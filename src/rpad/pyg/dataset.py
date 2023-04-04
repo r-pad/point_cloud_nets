@@ -17,6 +17,7 @@ from typing import (
     runtime_checkable,
 )
 
+import numpy as np
 import torch
 import torch.utils.data as td
 import torch_geometric.data as tgd
@@ -87,14 +88,17 @@ def _parallel_sample(
     try:
         # Sample the data.
         data_list = []
-        for _ in range(n_repeat):
-            data_list.append(__dataset.get_data(*get_data_args, seed=seed))
+        # Give each sample a different seed.
+        seeds = np.random.default_rng(seed).integers(0, 2**32, size=n_repeat)
+        for i in range(n_repeat):
+            data_list.append(__dataset.get_data(*get_data_args, seed=seeds[i]))
 
         # Save it in an in-memory dataset.
         SinglePathDataset.write(data_list, data_path)
 
     except Exception as err:
         logging.error(f"unable to sample get_data({get_data_args}): {err}")
+        raise ValueError(f"unable to sample get_data({get_data_args}): {err}")
 
 
 def parallel_sample(
@@ -162,9 +166,15 @@ def parallel_sample(
         n_workers=n_workers,
         n_proc_per_worker=n_proc_per_worker,
         seed=seed,
+        logfile=os.path.join(processed_path, "keys.txt"),
     )
 
+    failed_keys = sorted(
+        [get_data_args[i] for i in range(len(get_data_args)) if not completeds[i]]
+    )
     if not all(completeds):
+        ks = "\n".join([",".join(key) for key in failed_keys])
+        print(f"failed items: {ks}")
         raise ValueError("Sampling failed, please debug.")
 
 
@@ -228,8 +238,15 @@ class CachedByKeyDataset(tgd.Dataset, Generic[T]):
         # This has to come before inmem_dset is created.
         super().__init__(root, transform, pre_transform, pre_filter, log)
 
-        self.inmem_dset: td.ConcatDataset = td.ConcatDataset(
-            [SinglePathDataset(data_path) for data_path in self.processed_paths]
+        # Mapping from key to dataset.
+        self.inmem_dsets: Dict[str, SinglePathDataset] = {
+            key: SinglePathDataset(data_path)
+            for key, data_path in zip(self._data_keys, self.processed_paths)
+        }
+
+        # Concatenated dataset.
+        self.concat_dset: td.ConcatDataset = td.ConcatDataset(
+            [self.inmem_dsets[key] for key in self._data_keys]
         )
 
     @property
@@ -244,7 +261,10 @@ class CachedByKeyDataset(tgd.Dataset, Generic[T]):
         return len(self._data_keys) * self._n_repeat
 
     def get(self, idx: int):
-        return self.inmem_dset[idx]
+        return self.concat_dset[idx]
+
+    def get_data(self, *args, idx: int = 0):
+        return self.inmem_dsets[args][idx]
 
     def process(self):
         parallel_sample(
