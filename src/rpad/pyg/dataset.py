@@ -222,7 +222,7 @@ class CachedByKeyDataset(tgd.Dataset, Generic[T]):
         # Dataset.
         self._dset_cls = dset_cls
         self._dset_kwargs = dset_kwargs
-        self._data_keys = data_keys
+        self._data_keys: Sequence[Tuple[str]] = data_keys
 
         # Sampling parameters.
         self._processed_dirname = processed_dirname
@@ -239,7 +239,7 @@ class CachedByKeyDataset(tgd.Dataset, Generic[T]):
         super().__init__(root, transform, pre_transform, pre_filter, log)
 
         # Mapping from key to dataset.
-        self.inmem_dsets: Dict[str, SinglePathDataset] = {
+        self.inmem_dsets: Dict[Tuple[str, ...], SinglePathDataset] = {
             key: SinglePathDataset(data_path)
             for key, data_path in zip(self._data_keys, self.processed_paths)
         }

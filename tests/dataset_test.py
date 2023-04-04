@@ -39,8 +39,8 @@ def test_parallel_sample():
         assert len(data.pos) == 200
 
         # Then make sure everything is there.
-        # There are 2 extra files that are generated.
-        assert len(os.listdir(os.path.join(tmpdir, "processed_test"))) == 102
+        # There are 3 extra files that are generated.
+        assert len(os.listdir(os.path.join(tmpdir, "processed_test"))) == 103
         for i in range(100):
             assert os.path.exists(os.path.join(tmpdir, "processed_test", f"{i}_10.pt"))
 
