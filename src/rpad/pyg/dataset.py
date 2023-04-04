@@ -202,7 +202,7 @@ class CachedByKeyDataset(tgd.Dataset, Generic[T]):
         self,
         dset_cls: Type[T],
         dset_kwargs: Dict[str, Any],
-        data_keys: Union[Sequence[Tuple[str]], Sequence[str]],
+        data_keys: Union[Sequence[Tuple[str, ...]], Sequence[str]],
         root: Union[str, Path],
         processed_dirname: str,
         n_repeat: int,
@@ -222,7 +222,7 @@ class CachedByKeyDataset(tgd.Dataset, Generic[T]):
         # Dataset.
         self._dset_cls = dset_cls
         self._dset_kwargs = dset_kwargs
-        self._data_keys: Sequence[Tuple[str]] = data_keys
+        self._data_keys: Sequence[Tuple[str, ...]] = data_keys
 
         # Sampling parameters.
         self._processed_dirname = processed_dirname
